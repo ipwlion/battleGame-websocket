@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const { pool } = require('../utils/db');
 const { registerSchema, loginSchema } = require('../utils/validationSchemas');
 const router = express.Router();
+const cors = require('cors');
 
 // Middleware per CORS (può essere globale nel livello superiore dell'app)
 const corsOptions = {
