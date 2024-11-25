@@ -60,7 +60,7 @@ io.on('connection', (socket) => {
 
   socket.on('player_action', ({ roomName, movementData }) => {
     // Invia l'azione del giocatore a tutti gli altri nella stanza
-    socket.to(roomName).emit('enemy_action', { movementData });
+    io.to(roomName).emit('enemy_action', { movementData });
   });
 
   socket.on('disconnect', () => {
