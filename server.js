@@ -19,6 +19,9 @@ app.use(express.json());
 // Routes
 app.use('/auth', authRoutes);
 
+
+
+
 // Error Handling Middleware
 app.use(errorHandler);
 
@@ -37,6 +40,14 @@ io.on('connection', (socket) => {
     io.to(roomName).emit('room_update', rooms[roomName]);
   });
 
+  socket.on('start_game', ({ roomName }) => {
+    if (rooms[roomName] && rooms[roomName].players.length >= 2) {
+      io.to(roomName).emit('game_started', { message: 'The game has started!' });
+    } else {
+      socket.emit('error', 'Not enough players to start the game.');
+    }
+  });
+  
   socket.on('join_room', ({ roomName, username }) => {
     if (rooms[roomName]) {
       rooms[roomName].players.push({ id: socket.id, username, position: { x: 0, y: 0 } });
@@ -47,24 +58,27 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('player_move', ({ roomName, position }) => {
-    const player = rooms[roomName]?.players.find((p) => p.id === socket.id);
-    if (player) {
-      player.position = position;
-      io.to(roomName).emit('player_update', { id: socket.id, position });
-    }
+  socket.on('player_action', ({ roomName, movementData }) => {
+    // Invia l'azione del giocatore a tutti gli altri nella stanza
+    socket.to(roomName).emit('enemy_action', { movementData });
   });
 
   socket.on('disconnect', () => {
     console.log('A user disconnected:', socket.id);
     for (const roomName in rooms) {
       rooms[roomName].players = rooms[roomName].players.filter((p) => p.id !== socket.id);
+      
+      // Notifica agli altri giocatori nella stanza
       io.to(roomName).emit('room_update', rooms[roomName]);
+      
       if (rooms[roomName].players.length === 0) {
         delete rooms[roomName];
       }
     }
   });
+});
+app.get('/rooms', (req, res) => {
+  res.json(rooms);
 });
 
 // Start Server
