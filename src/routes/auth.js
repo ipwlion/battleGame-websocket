@@ -3,49 +3,81 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../utils/db');
 const { registerSchema, loginSchema } = require('../utils/validationSchemas');
-
 const router = express.Router();
 
+// Middleware per CORS (può essere globale nel livello superiore dell'app)
+const corsOptions = {
+  origin: ['http://localhost:8100'], // Sostituisci con il tuo dominio frontend
+  methods: ['POST', 'GET'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+router.use(cors(corsOptions)); // Configura CORS solo per queste rotte
+
+// Registrazione
 router.post('/register', async (req, res, next) => {
-  const { error } = registerSchema.validate(req.body);
-  if (error) return res.status(400).send({ error: error.details[0].message });
-
-  const { username, password } = req.body;
-  const hashedPassword = await bcrypt.hash(password, 10);
   try {
-    await pool.query('INSERT INTO users (username, password, status) VALUES ($1, $2, $3)', [
-      username,
-      hashedPassword,
-      'offline',
-    ]);
-    res.status(201).send({ message: 'User registered!' });
+    const { error } = registerSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+
+    const { username, password } = req.body;
+
+    // Hash della password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Inserimento nel database
+    await pool.query(
+      'INSERT INTO users (username, password, status) VALUES ($1, $2, $3)',
+      [username, hashedPassword, 'offline']
+    );
+
+    res.status(201).json({ message: 'User registered successfully!' });
   } catch (err) {
-    next(err);
-  }
-});
-
-router.post('/login', async (req, res, next) => {
-  const { error } = loginSchema.validate(req.body);
-  if (error) return res.status(400).send({ error: error.details[0].message });
-
-  const { username, password } = req.body;
-  try {
-    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
-    if (result.rowCount > 0) {
-      const user = result.rows[0];
-      const isMatch = await bcrypt.compare(password, user.password);
-      if (isMatch) {
-        const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-        res.status(200).send({ message: 'Login successful!', token });
-      } else {
-        res.status(401).send({ message: 'Invalid credentials' });
-      }
-    } else {
-      res.status(401).send({ message: 'Invalid credentials' });
+    // Gestione errore username duplicato
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'Username already exists' });
     }
+    next(err);
+  }
+});
+
+// Login
+router.post('/login', async (req, res, next) => {
+  try {
+    const { error } = loginSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+
+    const { username, password } = req.body;
+
+    // Recupero utente dal database
+    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+
+    if (result.rowCount === 0) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const user = result.rows[0];
+
+    // Verifica password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Generazione del token JWT
+    const token = jwt.sign(
+      { id: user.id, username: user.username },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    res.status(200).json({
+      message: 'Login successful!',
+      token,
+    });
   } catch (err) {
     next(err);
   }
 });
 
+// Esporta il router
 module.exports = router;

@@ -31,26 +31,26 @@ let rooms = {};
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
 
+  // Creazione della stanza
   socket.on('create_room', ({ roomName, username }) => {
     if (!rooms[roomName]) {
       rooms[roomName] = { players: [] };
     }
-    rooms[roomName].players.push({ id: socket.id, username, position: { x: 0, y: 0 } });
+    const role = rooms[roomName].players.length === 0 ? 'player1' : 'player2';
+    rooms[roomName].players.push({ id: socket.id, username, role, position: { x: 0, y: 0 } });
     socket.join(roomName);
     io.to(roomName).emit('room_update', rooms[roomName]);
   });
 
-  socket.on('start_game', ({ roomName }) => {
-    if (rooms[roomName] && rooms[roomName].players.length >= 2) {
-      io.to(roomName).emit('game_started', { message: 'The game has started!' });
-    } else {
-      socket.emit('error', 'Not enough players to start the game.');
-    }
-  });
-  
+  // Join nella stanza
   socket.on('join_room', ({ roomName, username }) => {
     if (rooms[roomName]) {
-      rooms[roomName].players.push({ id: socket.id, username, position: { x: 0, y: 0 } });
+      if (rooms[roomName].players.length >= 2) {
+        socket.emit('error', 'Room is full.');
+        return;
+      }
+      const role = rooms[roomName].players.length === 0 ? 'player1' : 'player2';
+      rooms[roomName].players.push({ id: socket.id, username, role, position: { x: 0, y: 0 } });
       socket.join(roomName);
       io.to(roomName).emit('room_update', rooms[roomName]);
     } else {
@@ -58,25 +58,38 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Movimento del giocatore
   socket.on('player_action', ({ roomName, movementData }) => {
-    // Invia l'azione del giocatore a tutti gli altri nella stanza
-    io.to(roomName).emit('enemy_action', { movementData });
+    const player = rooms[roomName]?.players.find((p) => p.id === socket.id);
+    if (player) {
+      player.position = movementData.position; // Aggiorna la posizione del giocatore
+      // Invia l'azione solo all'altro giocatore
+      socket.to(roomName).emit('enemy_action', { enemyId: socket.id, movementData });
+    }
   });
 
+  // Disconnessione
   socket.on('disconnect', () => {
     console.log('A user disconnected:', socket.id);
     for (const roomName in rooms) {
       rooms[roomName].players = rooms[roomName].players.filter((p) => p.id !== socket.id);
-      
-      // Notifica agli altri giocatori nella stanza
       io.to(roomName).emit('room_update', rooms[roomName]);
-      
       if (rooms[roomName].players.length === 0) {
         delete rooms[roomName];
       }
     }
   });
+
+  // Inizio del gioco
+  socket.on('start_game', ({ roomName }) => {
+    if (rooms[roomName] && rooms[roomName].players.length === 2) {
+      io.to(roomName).emit('game_started', { message: 'The game has started!' });
+    } else {
+      socket.emit('error', 'Not enough players to start the game.');
+    }
+  });
 });
+
 app.get('/rooms', (req, res) => {
   res.json(rooms);
 });
