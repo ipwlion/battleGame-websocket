@@ -3,6 +3,7 @@ const { Server } = require('socket.io');
 const http = require('http');
 const morgan = require('morgan');
 require('dotenv').config();
+require('./src/utils/initDb');
 
 const authRoutes = require('./src/routes/auth');
 const errorHandler = require('./src/middleware/errorHandler');
