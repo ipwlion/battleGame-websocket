@@ -31,7 +31,9 @@ router.post('/register', async (req, res, next) => {
       [username, hashedPassword, 'offline']
     );
 
-    res.status(201).json({ message: 'User registered successfully!' });
+    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+    const user = result.rows[0];
+    res.status(201).json({ message: 'User registered successfully!', user });
   } catch (err) {
     // Gestione errore username duplicato
     if (err.code === '23505') {
