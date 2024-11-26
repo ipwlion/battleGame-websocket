@@ -8,7 +8,7 @@ const cors = require('cors');
 
 // Middleware per CORS (può essere globale nel livello superiore dell'app)
 const corsOptions = {
-  origin: ['http://localhost:8100'], // Sostituisci con il tuo dominio frontend
+  origin: '*', // Sostituisci con il tuo dominio frontend
   methods: ['POST', 'GET'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
