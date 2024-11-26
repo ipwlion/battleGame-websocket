@@ -1,15 +1,16 @@
-
 const { Pool } = require('pg');
-
-const pool = new Pool({
+try {
+  const pool = new Pool({
     user: process.env.DB_USER,
     host: process.env.DB_HOST,
     database: process.env.DB_NAME,
     password: process.env.DB_PASSWORD,
-    port: process.env.DB_PORT,
+    port: parseInt(process.env.DB_PORT, 10),
     ssl: {
-      rejectUnauthorized: false, // Necessario per Render
+      rejectUnauthorized: false,
     },
   });
-  
-  module.exports = { pool };
+  console.log('Database connection successful');
+} catch (err) {
+  console.error('Error initializing database:', err.message);
+}
