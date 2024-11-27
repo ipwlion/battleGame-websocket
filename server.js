@@ -88,6 +88,23 @@ socket.on('join_room', async ({ roomName, userId }) => {
 });
 
 
+socket.on('select_character', ({ roomName, character }) => {
+  const room = rooms[roomName];
+  if (!room) return;
+
+  const player = room.players.find((p) => p.id === socket.id);
+  if (player) {
+    player.character = character;
+    console.log(`${player.username} selected ${character.name} in room ${roomName}`);
+
+    // Notifica agli altri giocatori della stanza
+    io.to(roomName).emit('character_selected', {
+      playerId: socket.id,
+      character,
+    });
+  }
+});
+
 socket.on('update_hp', ({ roomName, newHp, userId }) => {
   const room = rooms[roomName];
   if (!room) return;
@@ -175,7 +192,7 @@ socket.on('update_hp', ({ roomName, newHp, userId }) => {
   // Inizio del gioco
   socket.on('start_game', ({ roomName }) => {
     if (rooms[roomName] && rooms[roomName].players.length === 2) {
-      io.to(roomName).emit('game_started', { message: 'The game has started!' });
+      io.to(roomName).emit('game_started', { data: rooms[roomName], message: 'The game has started!' });
     } else {
       socket.emit('error', 'Not enough players to start the game.');
     }
