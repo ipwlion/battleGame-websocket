@@ -4,6 +4,7 @@ const http = require('http');
 const morgan = require('morgan');
 require('dotenv').config();
 require('./src/utils/initDb');
+const cors = require('cors');
 
 const authRoutes = require('./src/routes/auth');
 const errorHandler = require('./src/middleware/errorHandler');
@@ -12,6 +13,8 @@ const { pool } = require('./src/utils/db');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
+
+app.use(cors());
 
 // Middleware
 app.use(morgan('combined'));
