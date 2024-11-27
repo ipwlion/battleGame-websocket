@@ -53,7 +53,10 @@ socket.on('create_room', async ({ roomName, userId }) => {
     socket.join(roomName);
 
     io.to(roomName).emit('room_update', rooms[roomName]);
-    io.emit('rooms_update', rooms); // Invio solo i nomi delle stanze
+    io.emit('rooms_update', {
+      rooms,
+      roomName
+    }); // Invio solo i nomi delle stanze
   } catch (error) {
     console.error('Error creating room:', error.message);
     socket.emit('error', 'An error occurred while creating the room.');
@@ -82,7 +85,10 @@ socket.on('join_room', async ({ roomName, userId }) => {
       socket.join(roomName);
 
       io.to(roomName).emit('room_update', rooms[roomName]);
-      io.emit('rooms_update', rooms); // Invio solo i nomi delle stanze
+      io.emit('rooms_update', {
+        rooms,
+        roomName
+    }); // Invio solo i nomi delle stanze
     } else {
       socket.emit('error', 'Room does not exist.');
     }
