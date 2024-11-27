@@ -100,7 +100,7 @@ socket.on('select_character', ({ roomName, character }) => {
     // Notifica agli altri giocatori della stanza
     io.to(roomName).emit('character_selected', {
       playerId: socket.id,
-      character,
+      room: room.players,
     });
   }
 });
