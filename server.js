@@ -261,6 +261,39 @@ socket.on('exit_room', ({ roomName }) => {
     }
   });
   
+  socket.on('invite_player', async ({ roomName, inviterId, inviteeName }) => {
+    try {
+      // Controlla se il giocatore da invitare esiste
+      const result = await pool.query('SELECT id FROM users WHERE username = $1', [inviteeName]);
+      if (result.rowCount === 0) {
+        return socket.emit('error', `Player ${inviteeName} not found.`);
+      }
+  
+      const inviteeId = result.rows[0].id;
+  
+      // Cerca il socket del giocatore invitato
+      const targetSocket = Array.from(io.sockets.sockets.values()).find(
+        (s) => s.userId === inviteeId
+      );
+  
+      if (!targetSocket) {
+        return socket.emit('error', `Player ${inviteeName} is not online.`);
+      }
+  
+      // Invia una notifica all'utente invitato
+      targetSocket.emit('invite_notification', {
+        roomName,
+        inviterId,
+        inviterName: rooms[roomName]?.players.find((p) => p.userId === inviterId)?.username || 'Unknown',
+      });
+  
+      console.log(`Player ${inviteeName} invited to join room ${roomName}`);
+    } catch (error) {
+      console.error('Error inviting player:', error.message);
+      socket.emit('error', 'An error occurred while inviting the player.');
+    }
+  });
+  
 
   // Inizio del gioco
   socket.on('start_game', ({ roomName }) => {
