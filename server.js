@@ -140,6 +140,42 @@ socket.on('update_hp', ({ roomName, newHp, userId }) => {
 });
 
 
+socket.on('exit_room', ({ roomName }) => {
+  try {
+    if (rooms[roomName]) {
+      const room = rooms[roomName];
+
+      // Trova il giocatore nella stanza
+      const playerIndex = room.players.findIndex((p) => p.id === socket.id);
+
+      if (playerIndex !== -1) {
+        // Rimuovi il giocatore
+        const removedPlayer = room.players.splice(playerIndex, 1)[0];
+        console.log(`Player ${removedPlayer.username} exited room ${roomName}`);
+
+        // Aggiorna gli altri giocatori nella stanza
+        io.to(roomName).emit('room_update', rooms[roomName]);
+
+        // Se la stanza è vuota, cancellala
+        if (room.players.length === 0) {
+          delete rooms[roomName];
+          console.log(`Room ${roomName} deleted because it is empty.`);
+        }
+
+        // Aggiorna la lista delle stanze globalmente
+        io.emit('rooms_update', { rooms });
+      } else {
+        console.log(`Player not found in room ${roomName}`);
+      }
+    } else {
+      console.log(`Room ${roomName} does not exist.`);
+    }
+  } catch (error) {
+    console.error('Error handling exit_room:', error.message);
+  }
+});
+
+
   // Movimento del giocatore
   socket.on('player_action', ({ roomName, movementData, userId }) => {
     try {
@@ -190,15 +226,34 @@ socket.on('update_hp', ({ roomName, newHp, userId }) => {
   
   // Disconnessione
   socket.on('disconnect', () => {
-    console.log('A user disconnected:', socket.id);
+    console.log(`User disconnected: ${socket.id}`);
+  
+    // Cerca la stanza in cui si trova il giocatore
     for (const roomName in rooms) {
-      rooms[roomName].players = rooms[roomName].players.filter((p) => p.id !== socket.id);
-      io.to(roomName).emit('room_update', rooms[roomName]);
-      if (rooms[roomName].players.length === 0) {
-        delete rooms[roomName];
+      const room = rooms[roomName];
+      const playerIndex = room.players.findIndex((p) => p.id === socket.id);
+  
+      if (playerIndex !== -1) {
+        // Rimuovi il giocatore dalla stanza
+        const removedPlayer = room.players.splice(playerIndex, 1)[0];
+        console.log(`Removed player ${removedPlayer.username} from room ${roomName}`);
+  
+        // Invia un aggiornamento ai giocatori nella stanza
+        io.to(roomName).emit('room_update', rooms[roomName]);
+  
+        // Se la stanza è vuota, cancellala
+        if (room.players.length === 0) {
+          delete rooms[roomName];
+          console.log(`Room ${roomName} deleted because it is empty.`);
+        }
+  
+        // Aggiorna la lista delle stanze globalmente
+        io.emit('rooms_update', { rooms });
+        break;
       }
     }
   });
+  
 
   // Inizio del gioco
   socket.on('start_game', ({ roomName }) => {
