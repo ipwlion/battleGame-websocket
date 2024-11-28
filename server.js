@@ -13,7 +13,6 @@ const { pool } = require('./src/utils/db');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
-
 app.use(cors());
 
 // Middleware
@@ -28,11 +27,16 @@ app.use(errorHandler);
 
 // WebSocket Handling
 let rooms = {};
+const userSockets = new Map(); // Mappa userId -> socket.id
 
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
 
-  // Creazione della stanza 
+  socket.on('register_user', ({ userId }) => {
+    socket.userId = userId;
+    userSockets.set(userId, socket.id); // Mappa userId -> socket.id
+    console.log(`User ${userId} registered with socket ID ${socket.id}`);
+  });
 // Creazione della stanza
 socket.on('create_room', async ({ roomName, userId }) => {
   try {
@@ -235,6 +239,11 @@ socket.on('exit_room', ({ roomName }) => {
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`);
   
+    if (socket.userId) {
+      userSockets.delete(socket.userId);
+      console.log(`User ${socket.userId} disconnected.`);
+    }
+
     // Cerca la stanza in cui si trova il giocatore
     for (const roomName in rooms) {
       const room = rooms[roomName];
@@ -263,7 +272,7 @@ socket.on('exit_room', ({ roomName }) => {
   
   socket.on('invite_player', async ({ roomName, inviterId, inviteeName }) => {
     try {
-      // Controlla se il giocatore da invitare esiste
+      // Trova l'invitato nel database
       const result = await pool.query('SELECT id FROM users WHERE username = $1', [inviteeName]);
       if (result.rowCount === 0) {
         return socket.emit('error', `Player ${inviteeName} not found.`);
@@ -271,20 +280,26 @@ socket.on('exit_room', ({ roomName }) => {
   
       const inviteeId = result.rows[0].id;
   
-      // Cerca il socket del giocatore invitato
-      const targetSocket = Array.from(io.sockets.sockets.values()).find(
-        (s) => s.userId === inviteeId
-      );
+      // Trova il socket ID dell'invitato
+      const inviteeSocketId = userSockets.get(String(inviteeId));
+      console.log('inviteeId (typeof):', typeof inviteeId);
+      console.log('Keys in userSockets (typeof):', Array.from(userSockets.keys()).map((key) => ({ key, type: typeof key })));
+      
+      console.log('Mapping userSockets:', Array.from(userSockets.entries())); // Log completo della mappa
+      console.log('inviteeId:', inviteeId);
+      console.log('inviteeSocketId:', inviteeSocketId);
   
-      if (!targetSocket) {
+      if (!inviteeSocketId) {
         return socket.emit('error', `Player ${inviteeName} is not online.`);
       }
   
-      // Invia una notifica all'utente invitato
-      targetSocket.emit('invite_notification', {
+      const inviterName = rooms[roomName]?.players.find((p) => p.userId === inviterId)?.username || 'Unknown';
+  
+      // Invia una notifica all'invitato
+      io.to(inviteeSocketId).emit('invite_notification', {
         roomName,
         inviterId,
-        inviterName: rooms[roomName]?.players.find((p) => p.userId === inviterId)?.username || 'Unknown',
+        inviterName,
       });
   
       console.log(`Player ${inviteeName} invited to join room ${roomName}`);
