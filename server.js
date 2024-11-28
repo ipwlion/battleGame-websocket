@@ -153,6 +153,14 @@ socket.on('exit_room', ({ roomName }) => {
         const removedPlayer = room.players.splice(playerIndex, 1)[0];
         console.log(`Player ${removedPlayer.username} exited room ${roomName}`);
 
+        // Riassegna i ruoli se necessario
+        if (room.players.length > 0) {
+          room.players[0].role = 'player1';
+          if (room.players.length > 1) {
+            room.players[1].role = 'player2';
+          }
+        }
+
         // Aggiorna gli altri giocatori nella stanza
         io.to(roomName).emit('room_update', rooms[roomName]);
 
@@ -174,7 +182,6 @@ socket.on('exit_room', ({ roomName }) => {
     console.error('Error handling exit_room:', error.message);
   }
 });
-
 
   // Movimento del giocatore
   socket.on('player_action', ({ roomName, movementData, userId }) => {
